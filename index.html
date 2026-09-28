@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LYRA - AI Onion Quality Assessment & Grading System</title>
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        onion: {
+                            50: '#FDF4F5',
+                            100: '#F8E6E8',
+                            200: '#F0CCD2',
+                            300: '#E2A2AC',
+                            400: '#CF6C7F',
+                            500: '#B8405A',
+                            600: '#9E2A43',
+                            700: '#7E1E34',
+                            800: '#5E1527',
+                            900: '#3D0D19',
+                            950: '#23060E',
+                        },
+                        skin: {
+                            50: '#FEFAF0',
+                            100: '#FAF0D3',
+                            200: '#F3DEA0',
+                            300: '#E9C66B',
+                            400: '#DFA73E',
+                            500: '#C88720',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #1A070B; color: #F8E6E8; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #23060E; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #7E1E34; border-radius: 4px; }
+        .camera-overlay-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(226, 162, 172, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(226, 162, 172, 0.1) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scrollbar">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Icons Helper Component wrapper for Lucide Icons
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        // Translations Dictionary
+        const translations = {
+            English: {
+                tagline: "Exploring Layers",
+                subtitle: "Standardized AI Onion Grading & Quality Assessment",
+                mandiHub: "Nashik APMC Main Procurement Yard",
+                inspector: "Inspector #4092 (R. K. Shinde)",
+                farmer: "Farmer: Suresh Patil (ID: MH-NSK-8821)",
+                tabs: {
+                    inspection: "New Quality Assessment",
+                    report: "Digital Quality Report",
+                    disputes: "Dispute Appeals",
+                    analytics: "Center Analytics"
+                },
+                variety: "Select Variety & Season",
+                captureTitle: "Guided Sample Tray Capture & Scan",
+                calibrateText: "Upload or take a photo of the representative onion sample on the calibration tray",
+                uploadBtn: "Take Photo / Choose Image File",
+                analyzeBtn: "Run AI Quality & Size Scan",
+                analyzing: "Segmenting Bulbs & Classifying Defects...",
+                gradeA: "Marketable Grade-A",
+                urs: "URS (Undersized/Rotten/Sprouted)",
+                signOff: "Acknowledge & Sign Digitally",
+                signedStatus: "Report Cryptographically Signed & Locked",
+                hashText: "SHA-256 Hash Verification:"
+            },
+            Hindi: {
+                tagline: "परतों की खोज (Exploring Layers)",
+                subtitle: "मानकीकृत एआई प्याज ग्रेडिंग और गुणवत्ता मूल्यांकन",
+                mandiHub: "नासिक एपीएमसी मुख्य खरीद केंद्र",
+                inspector: "निरीक्षक #4092 (आर. के. शिंदे)",
+                farmer: "किसान: सुरेश पाटिल (आईडी: MH-NSK-8821)",
+                tabs: {
+                    inspection: "नया गुणवत्ता मूल्यांकन",
+                    report: "डिजिटल गुणवत्ता रिपोर्ट",
+                    disputes: "विवाद अपील",
+                    analytics: "केंद्र विश्लेषण"
+                },
+                variety: "किस्म और मौसम चुनें",
+                captureTitle: "निर्देशित नमूना ट्रे कैप्चर और स्कैन",
+                calibrateText: "कैलिब्रेशन ट्रे पर रखे प्याज के नमूने की फोटो अपलोड करें या खींचें",
+                uploadBtn: "फोटो लें / इमेज फाइल चुनें",
+                analyzeBtn: "एआई गुणवत्ता और आकार स्कैन चलाएं",
+                analyzing: "प्याज का वर्गीकरण और दोषों का विश्लेषण चालू है...",
+                gradeA: "बिक्री योग्य ग्रेड-ए",
+                urs: "यूआरएस (छोटा/सड़ा/अंकुरित)",
+                signOff: "डिजिटल हस्ताक्षर और स्वीकृति दें",
+                signedStatus: "रिपोर्ट सुरक्षित रूप से हैश और लॉक की गई",
+                hashText: "SHA-256 हैश सत्यापन:"
+            },
+            Tamil: {
+                tagline: "அடுக்குகளை ஆராய்தல் (Exploring Layers)",
+                subtitle: "தரப்படுத்தப்பட்ட AI வெங்காய தரம் பிரித்தல் பயன்பாடு",
+                mandiHub: "நாசிக் APMC கொள்முதல் மையம்",
+                inspector: "ஆய்வாளர் #4092 (R. K. ஷிண்டே)",
+                farmer: "விவசாயி: சுரேஷ் பாட்டீல் (ID: MH-NSK-8821)",
+                tabs: {
+                    inspection: "புதிய தரம் அறிதல்",
+                    report: "டிஜிட்டல் தர அறிக்கை",
+                    disputes: "சர்ச்சை மேல்முறையீடு",
+                    analytics: "மைய பகுப்பாய்வு"
+                },
+                variety: "ரகம் மற்றும் பருவத்தை தேர்ந்தெடுக்கவும்",
+                captureTitle: "மாதிரி தட்டு படம் எடுத்தல் மற்றும் ஆய்வு",
+                calibrateText: "வெங்காய மாதிரி புகைப்படத்தை பதிவேற்றவும் அல்லது கேமரா மூலம் படம் எடுக்கவும்",
+                uploadBtn: "படம் எடுக்கவும் / ஃபைல் தேர்ந்தெடுக்கவும்",
+                analyzeBtn: "AI தரம் மற்றும் அளவு ஆய்வை இயக்கு",
+                analyzing: "வெங்காயங்கள் பகுப்பாய்வு செய்யப்படுகின்றன...",
+                gradeA: "சந்தை தர ரகம்-A",
+                urs: "URS (சிறிய/அழுகிய/முளைத்த)",
+                signOff: "டிஜிட்டல் ஒப்புதல் அளிக்கவும்",
+                signedStatus: "அறிக்கை குறியாக்கம் செய்யப்பட்டு பாதுகாக்கப்பட்டது",
+                hashText: "SHA-256 ஹேஷ் சரிபார்ப்பு:"
+            },
+            Marathi: {
+                tagline: "थरांचा शोध घेताना (Exploring Layers)",
+                subtitle: "प्रमाणित AI कांदा प्रतवारी आणि गुणवत्ता मूल्यमापन",
+                mandiHub: "नाशिक एपीएमसी मुख्य खरेदी केंद्र",
+                inspector: "तपासणीस #4092 (आर. के. शिंदे)",
+                farmer: "शेतकरी: सुरेश पाटील (ID: MH-NSK-8821)",
+                tabs: {
+                    inspection: "नवीन गुणवत्ता मूल्यमापन",
+                    report: "डिजिटल गुणवत्ता अहवाल",
+                    disputes: "तक्रार निवारण",
+                    analytics: "केंद्र विश्लेषण"
+                },
+                variety: "कांदा प्रकार आणि हंगाम निवडा",
+                captureTitle: "मार्गदर्शित नमुना ट्रे कॅप्चर आणि स्कॅन",
+                calibrateText: "कॅलिब्रेशन ट्रेवरील कांद्याच्या नमुन्याचा फोटो अपलोड करा किंवा काढा",
+                uploadBtn: "फोटो काढा / इमेज फाईल निवडा",
+                analyzeBtn: "AI गुणवत्ता आणि आकार स्कॅन सुरू करा",
+                analyzing: "कांद्याचे वर्गीकरण आणि दोष तपासणी सुरू आहे...",
+                gradeA: "विक्रीयोग्य ग्रेड-ए",
+                urs: "URS (लहान/कुजलेले/कोंब आलेले)",
+                signOff: "डिजिटल स्वाक्षरी आणि संमती द्या",
+                signedStatus: "अहवाल डिजिटलरीत्या सुरक्षित आणि लॉक केला",
+                hashText: "SHA-256 हॅश पडताळणी:"
+            },
+            Telugu: {
+                tagline: "పొరలను అన్వేషించడం (Exploring Layers)",
+                subtitle: "ప్రామాణిక AI ఉల్లిపాయ గ్రేడింగ్ & నాణ్యత తనిఖీ",
+                mandiHub: "నాసిక్ APMC కొనుగోలు కేంద్రం",
+                inspector: "ఇన్స్పెక్టర్ #4092 (R. K. షిండే)",
+                farmer: "రైతు: సురేష్ పాటిల్ (ID: MH-NSK-8821)",
+                tabs: {
+                    inspection: "కొత్త నాణ్యత తనిఖీ",
+                    report: "డిజిటల్ నాణ్యత నివేదిక",
+                    disputes: "ఫిర్యాదుల పరిష్కారం",
+                    analytics: "కేంద్ర విశ్లేషణ"
+                },
+                variety: "రకం మరియు సీజన్ ఎంచుకోండి",
+                captureTitle: "నమూనా ట్రే క్యాప్చర్ & స్కాన్",
+                calibrateText: "కాలిబ్రేషన్ ట్రేలో ఉన్న ఉల్లిపాయల నమూనా ఫోటోను తీయండి లేదా అప్‌లోడ్ చేయండి",
+                uploadBtn: "ఫోటో తీయండి / ఫైల్ ఎంచుకోండి",
+                analyzeBtn: "AI స్కాన్ ప్రారంభించు",
+                analyzing: "ఉల్లిపాయల విశ్లేషణ జరుగుతోంది...",
+                gradeA: "అమ్మకానికి తగిన గ్రేడ్-A",
+                urs: "URS (చిన్నవి/కుళ్ళినవి/మొలకెత్తినవి)",
+                signOff: "డిజిటల్ సంతకం & ఆమోదం",
+                signedStatus: "నివేదిక సురక్షితంగా డిజిటల్ లాక్ చేయబడింది",
+                hashText: "SHA-256 హ్యాష్ ధృవీకరణ:"
+            },
+            Kannada: {
+                tagline: "ಪದರಗಳನ್ನು ಅನ್ವೇಷಿಸುವುದು (Exploring Layers)",
+                subtitle: "ಗುಣಮಟ್ಟದ AI ಈರುಳ್ಳಿ ಗ್ರೇಡಿಂಗ್ ವ್ಯವಸ್ಥೆ",
+                mandiHub: "ನಾಸಿಕ್ APMC ಖರೀದಿ ಕೇಂದ್ರ",
+                inspector: "ಪರಿಶೀಲಕ #4092 (R. K. ಶಿಂಡೆ)",
+                farmer: "ರೈತ: ಸುರೇಶ್ ಪಾಟೀಲ್ (ID: MH-NSK-8821)",
+                tabs: {
+                    inspection: "ಹೊಸ ಗುಣಮಟ್ಟದ ತಪಾಸಣೆ",
+                    report: "ಡಿಜಿಟಲ್ ವರದಿ",
+                    disputes: "ವಿವಾದ ಪರಿಹಾರ",
+                    analytics: "ಕೇಂದ್ರ ವಿಶ್ಲೇಷಣೆ"
+                },
+                variety: "ತಳಿ ಮತ್ತು ಋತುವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+                captureTitle: "ಮಾದರಿ ಟ್ರೇ ಕ್ಯಾಪ್ಚರ್ & ಸ್ಕ್ಯಾನ್",
+                calibrateText: "ಕ್ಯಾಲಿಬ್ರೇಶನ್ ಟ್ರೇನಲ್ಲಿರುವ ಈರುಳ್ಳಿ ಮಾದರಿಯ ಫೋಟೋವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ ಅಥವಾ ಸೆರೆಹಿಡಿಯಿರಿ",
+                uploadBtn: "ಫೋಟೋ ತೆಗೆಯಿರಿ / ಫೈಲ್ ಆಯ್ಕೆಮಾಡಿ",
+                analyzeBtn: "AI ತಪಾಸಣೆ ಪ್ರಾರಂಭಿಸಿ",
+                analyzing: "ಈರುಳ್ಳಿಗಳ ವಿಶ್ಲೇಷಣೆ ನಡೆಯುತ್ತಿದೆ...",
+                gradeA: "ಮಾರುಕಟ್ಟೆ ಯೋಗ್ಯ ಗ್ರೇಡ್-A",
+                urs: "URS (ಸಣ್ಣ/ಕೊಳೆತ/ಮೊಳಕೆಯೊಡೆದ)",
+                signOff: "ಡಿಜಿಟಲ್ ಸಹಿ ಮತ್ತು ಅನುಮೋದನೆ",
+                signedStatus: "ವರದಿಯನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ಲಾಕ್ ಮಾಡಲಾಗಿದೆ",
+                hashText: "SHA-256 ಹ್ಯಾಶ್ ಪರಿಶೀಲನೆ:"
+            }
+        };
+
+        // Mock Sample Detected Onions Data
+        const initialOnionDetections = [
+            { id: 1, x: 22, y: 25, sizeMm: 58, status: "Grade A", defect: "Healthy", score: 0.98 },
+            { id: 2, x: 48, y: 22, sizeMm: 62, status: "Grade A", defect: "Healthy", score: 0.96 },
+            { id: 3, x: 74, y: 28, sizeMm: 55, status: "Grade A", defect: "Healthy", score: 0.94 },
+            { id: 4, x: 20, y: 58, sizeMm: 38, status: "URS", defect: "Undersized (<45mm)", score: 0.99 },
+            { id: 5, x: 49, y: 62, sizeMm: 56, status: "URS", defect: "Fungal Spotting / Rot", score: 0.92 },
+            { id: 6, x: 78, y: 59, sizeMm: 52, status: "URS", defect: "Sprouting Tip", score: 0.95 },
+            { id: 7, x: 35, y: 82, sizeMm: 61, status: "Grade A", defect: "Healthy", score: 0.97 },
+            { id: 8, x: 62, y: 84, sizeMm: 59, status: "Grade A", defect: "Healthy", score: 0.93 }
+        ];
+
+        // APMC Dispute Analytics Mock Data
+        const apmcCentersData = [
+            { name: "Nashik Main Yard", manualAvgA: 78, aiAvgA: 64, gap: "+14% Overgrade", disputes: 42, status: "High Discrepancy Alert" },
+            { name: "Pimplegaon Baswant", manualAvgA: 68, aiAvgA: 66, gap: "+2% Normal", disputes: 5, status: "Optimal Alignment" },
+            { name: "Lasalgaon Center 2", manualAvgA: 82, aiAvgA: 65, gap: "+17% Overgrade", disputes: 58, status: "Audit Flagged" },
+            { name: "Kalwan Micro-Hub", manualAvgA: 62, aiAvgA: 61, gap: "+1% Normal", disputes: 3, status: "Optimal Alignment" },
+            { name: "Yeola Procurement", manualAvgA: 75, aiAvgA: 63, gap: "+12% Overgrade", disputes: 29, status: "Review Suggested" }
+        ];
+
+        function LyraApp() {
+            // Core Application States
+            const [language, setLanguage] = useState('English');
+            const [role, setRole] = useState('inspector'); // inspector, farmer, supervisor
+            const [activeTab, setActiveTab] = useState('inspection'); // inspection, report, disputes, analytics
+            
+            // Image Upload / Camera State
+            const [uploadedImage, setUploadedImage] = useState("https://images.unsplash.com/photo-1618512496248-a07fe83aa8cf?w=800&q=80");
+            const fileInputRef = useRef(null);
+
+            // Inspection Config States
+            const [variety, setVariety] = useState('Nashik Red (Rabi Season)');
+            const [lightingStatus, setLightingStatus] = useState('Optimal (520 Lux)');
+            const [focusStatus, setFocusStatus] = useState('Sharp (98%)');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [scanComplete, setScanComplete] = useState(true);
+            
+            // Digital Report & Sign-off States
+            const [lotWeightKg, setLotWeightKg] = useState('1,250');
+            const [isSignedByFarmer, setIsSignedByFarmer] = useState(false);
+            const [reportHash, setReportHash] = useState("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+            const [disputeFiled, setDisputeFiled] = useState(false);
+
+            const t = translations[language];
+
+            // Handle Photo Upload / Camera Capture
+            const handleImageUpload = (event) => {
+                const file = event.target.files && event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        setUploadedImage(e.target.result);
+                        setScanComplete(false); // require scan after upload
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            // Calculate Rollups
+            const totalOnions = initialOnionDetections.length;
+            const gradeACount = initialOnionDetections.filter(d => d.status === 'Grade A').length;
+            const ursCount = totalOnions - gradeACount;
+            const gradeAPercent = ((gradeACount / totalOnions) * 100).toFixed(1);
+            const ursPercent = ((ursCount / totalOnions) * 100).toFixed(1);
+
+            // Defect Counts
+            const defectCounts = {
+                healthy: initialOnionDetections.filter(d => d.defect === 'Healthy').length,
+                undersized: initialOnionDetections.filter(d => d.defect.includes('Undersized')).length,
+                rot: initialOnionDetections.filter(d => d.defect.includes('Rot')).length,
+                sprouted: initialOnionDetections.filter(d => d.defect.includes('Sprouting')).length,
+            };
+
+            // Trigger AI Quality Scan Simulation
+            const handleRunAiScan = () => {
+                setIsAnalyzing(true);
+                setScanComplete(false);
+                setTimeout(() => {
+                    setIsAnalyzing(false);
+                    setScanComplete(true);
+                    const randomHash = "0x" + Array.from({length: 32}, () => Math.floor(Math.random()*16).toString(16)).join('');
+                    setReportHash(randomHash);
+                }, 2000);
+            };
+
+            return (
+                <div className="flex-1 flex flex-col max-w-7xl w-full mx-auto p-3 md:p-6 space-y-5">
+                    
+                    {/* TOP HEADER BAR */}
+                    <header className="bg-gradient-to-r from-onion-950 via-onion-900 to-onion-950 border border-onion-700/60 rounded-2xl p-4 md:p-5 flex flex-wrap items-center justify-between gap-4 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-onion-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        
+                        <div className="flex items-center space-x-3.5 z-10">
+                            <div className="bg-gradient-to-br from-onion-500 to-onion-700 p-3 rounded-2xl text-white shadow-lg border border-onion-400/30 flex items-center justify-center">
+                                <Icon name="layers" className="w-8 h-8 text-skin-200" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                                        LYRA
+                                    </h1>
+                                    <span className="text-xs font-bold px-2.5 py-0.5 bg-skin-300/20 text-skin-300 border border-skin-300/30 rounded-full">
+                                        {t.tagline}
+                                    </span>
+                                </div>
+                                <p className="text-xs md:text-sm text-onion-200 font-medium">{t.subtitle}</p>
+                            </div>
+                        </div>
+
+                        {/* Controls: Role Switcher & Language Selector */}
+                        <div className="flex flex-wrap items-center gap-3 z-10">
+                            {/* Role Toggle */}
+                            <div className="bg-onion-950/80 p-1 rounded-xl border border-onion-700/80 flex text-xs">
+                                <button 
+                                    onClick={() => setRole('inspector')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 ${
+                                        role === 'inspector' ? 'bg-onion-600 text-white shadow-md' : 'text-onion-300 hover:text-white'
+                                    }`}>
+                                    <Icon name="user-check" className="w-3.5 h-3.5" />
+                                    Inspector
+                                </button>
+                                <button 
+                                    onClick={() => setRole('farmer')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 ${
+                                        role === 'farmer' ? 'bg-onion-600 text-white shadow-md' : 'text-onion-300 hover:text-white'
+                                    }`}>
+                                    <Icon name="tractor" className="w-3.5 h-3.5" />
+                                    Farmer
+                                </button>
+                                <button 
+                                    onClick={() => setRole('supervisor')}
+                                    className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 ${
+                                        role === 'supervisor' ? 'bg-onion-600 text-white shadow-md' : 'text-onion-300 hover:text-white'
+                                    }`}>
+                                    <Icon name="shield-alert" className="w-3.5 h-3.5" />
+                                    APMC Officer
+                                </button>
+                            </div>
+
+                            {/* Multilingual Selector */}
+                            <div className="flex items-center gap-1.5 bg-onion-950/80 px-3 py-1.5 rounded-xl border border-onion-700/80 text-xs text-onion-200">
+                                <Icon name="globe" className="w-4 h-4 text-skin-300" />
+                                <select 
+                                    value={language} 
+                                    onChange={(e) => setLanguage(e.target.value)}
+                                    className="bg-transparent font-semibold focus:outline-none text-white cursor-pointer">
+                                    <option value="English" className="bg-onion-950 text-white">English</option>
+                                    <option value="Hindi" className="bg-onion-950 text-white">हिंदी (Hindi)</option>
+                                    <option value="Tamil" className="bg-onion-950 text-white">தமிழ் (Tamil)</option>
+                                    <option value="Marathi" className="bg-onion-950 text-white">मराठी (Marathi)</option>
+                                    <option value="Telugu" className="bg-onion-950 text-white">తెలుగు (Telugu)</option>
+                                    <option value="Kannada" className="bg-onion-950 text-white">ಕನ್ನಡ (Kannada)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* LOCATION & INSPECTOR METADATA STRIP */}
+                    <div className="bg-onion-950/70 border border-onion-800/80 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between text-xs text-onion-200 gap-2">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <a
+                                href="https://maps.google.com/?q=20.0059,73.7898"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 text-skin-300 font-semibold hover:text-skin-200 underline underline-offset-4"
+                            >
+                                <Icon name="map-pin" className="w-3.5 h-3.5 text-onion-400" />
+                                {t.mandiHub} (GPS: 20.0059° N, 73.7898° E)
+                            </a>
+                            <span className="text-onion-400">|</span>
+                            <span className="flex items-center gap-1.5">
+                                <Icon name="badge-check" className="w-3.5 h-3.5 text-emerald-400" />
+                                {t.inspector}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-onion-300 font-medium">{t.farmer}</span>
+                            <span className="bg-onion-800/80 px-2 py-0.5 rounded border border-onion-700 text-[11px] font-mono">
+                                Lot #ON-2026-0941
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* NAVIGATION TABS */}
+                    <nav className="flex flex-wrap gap-2 border-b border-onion-800/80 pb-2">
+                        <button 
+                            onClick={() => setActiveTab('inspection')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition ${
+                                activeTab === 'inspection' 
+                                ? 'bg-onion-600 text-white border border-onion-400 shadow-md' 
+                                : 'text-onion-300 hover:bg-onion-900/60 hover:text-white'
+                            }`}>
+                            <Icon name="camera" className="w-4 h-4 text-skin-300" /> {t.tabs.inspection}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('report')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition ${
+                                activeTab === 'report' 
+                                ? 'bg-onion-600 text-white border border-onion-400 shadow-md' 
+                                : 'text-onion-300 hover:bg-onion-900/60 hover:text-white'
+                            }`}>
+                            <Icon name="file-text" className="w-4 h-4 text-skin-300" /> {t.tabs.report}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('disputes')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition ${
+                                activeTab === 'disputes' 
+                                ? 'bg-onion-600 text-white border border-onion-400 shadow-md' 
+                                : 'text-onion-300 hover:bg-onion-900/60 hover:text-white'
+                            }`}>
+                            <Icon name="scale" className="w-4 h-4 text-amber-400" /> {t.tabs.disputes}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('analytics')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition ${
+                                activeTab === 'analytics' 
+                                ? 'bg-onion-600 text-white border border-onion-400 shadow-md' 
+                                : 'text-onion-300 hover:bg-onion-900/60 hover:text-white'
+                            }`}>
+                            <Icon name="bar-chart-3" className="w-4 h-4 text-emerald-400" /> {t.tabs.analytics}
+                        </button>
+                    </nav>
+
+                    {/* MAIN TAB CONTENT PANELS */}
+
+                    {/* TAB 1: INSPECTION & LIVE AI SAMPLE ANALYSIS */}
+                    {activeTab === 'inspection' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            
+                            {/* Left Column: Camera / Image Upload & Overlay Canvas (7 cols) */}
+                            <div className="lg:col-span-7 bg-onion-950 border border-onion-800/80 rounded-2xl p-4 md:p-5 flex flex-col space-y-4 shadow-xl">
+                                
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                            <Icon name="aperture" className="w-5 h-5 text-skin-300" />
+                                            {t.captureTitle}
+                                        </h2>
+                                        <p className="text-xs text-onion-300">{t.calibrateText}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50 flex items-center gap-1 font-medium">
+                                            <Icon name="sun" className="w-3 h-3 text-emerald-400" /> {lightingStatus}
+                                        </span>
+                                        <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50 flex items-center gap-1 font-medium">
+                                            <Icon name="focus" className="w-3 h-3 text-emerald-400" /> {focusStatus}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Hidden File Input for Camera or File Picker */}
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    capture="environment"
+                                    ref={fileInputRef}
+                                    onChange={handleImageUpload}
+                                    className="hidden" 
+                                />
+
+                                {/* Camera Capture / Upload Trigger Strip */}
+                                <div className="flex items-center gap-3 bg-onion-900/70 p-3 rounded-xl border border-onion-700">
+                                    <button 
+                                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                                        className="px-4 py-2 bg-skin-400 hover:bg-skin-300 text-onion-950 font-bold rounded-lg text-xs transition flex items-center gap-2 shadow">
+                                        <Icon name="upload-cloud" className="w-4 h-4" />
+                                        {t.uploadBtn}
+                                    </button>
+                                    <span className="text-xs text-onion-300 italic">
+                                        Tap to open camera or upload onion tray photo
+                                    </span>
+                                </div>
+
+                                {/* Guided Frame & Sample Visual Overlay Canvas */}
+                                <div className="relative aspect-[4/3] bg-slate-950 rounded-xl overflow-hidden border-2 border-onion-700/70 shadow-inner flex items-center justify-center camera-overlay-grid">
+                                    
+                                    {/* Calibration Tray Corner Markers */}
+                                    <div className="absolute top-3 left-3 w-8 h-8 border-t-2 border-l-2 border-skin-300 flex items-center justify-center text-[10px] font-mono text-skin-300 font-bold">A1</div>
+                                    <div className="absolute top-3 right-3 w-8 h-8 border-t-2 border-r-2 border-skin-300 flex items-center justify-center text-[10px] font-mono text-skin-300 font-bold">A2</div>
+                                    <div className="absolute bottom-3 left-3 w-8 h-8 border-b-2 border-l-2 border-skin-300 flex items-center justify-center text-[10px] font-mono text-skin-300 font-bold">B1</div>
+                                    <div className="absolute bottom-3 right-3 w-8 h-8 border-b-2 border-r-2 border-skin-300 flex items-center justify-center text-[10px] font-mono text-skin-300 font-bold">B2</div>
+
+                                    {/* Center Calibration Marker */}
+                                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur px-3 py-1 rounded-full border border-skin-300/40 text-[10px] font-mono text-skin-300 flex items-center gap-1.5 z-10">
+                                        <Icon name="ruler" className="w-3 h-3" /> Calibration Marker: 50mm Standard Tray Ring
+                                    </div>
+
+                                    {/* Selected/Uploaded Onion Image */}
+                                    <img 
+                                        src={uploadedImage} 
+                                        alt="Onion Sample Tray" 
+                                        className={`w-full h-full object-cover transition-all duration-500 ${isAnalyzing ? 'opacity-40 filter blur-[2px]' : 'opacity-85'}`}
+                                    />
+
+                                    {/* Instance Segmentation Bounding Circles Overlay */}
+                                    {scanComplete && !isAnalyzing && initialOnionDetections.map((bulb) => (
+                                        <div 
+                                            key={bulb.id}
+                                            style={{ top: `${bulb.y}%`, left: `${bulb.x}%` }}
+                                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer z-10">
+                                            
+                                            <div className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-2 ${
+                                                bulb.status === 'Grade A' ? 'border-emerald-400 bg-emerald-500/20' : 'border-rose-500 bg-rose-500/30'
+                                            } flex items-center justify-center animate-pulse transition-transform hover:scale-110 shadow-lg`}>
+                                                <span className="text-[10px] font-extrabold text-white bg-black/70 px-1 rounded">
+                                                    #{bulb.id}
+                                                </span>
+                                            </div>
+
+                                            <div className="mt-1 bg-black/90 backdrop-blur border border-onion-700 rounded px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                                                <span className={bulb.status === 'Grade A' ? 'text-emerald-400' : 'text-rose-400'}>
+                                                    {bulb.defect}
+                                                </span> ({bulb.sizeMm}mm)
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Loading Overlay when AI is analyzing */}
+                                    {isAnalyzing && (
+                                        <div className="absolute inset-0 bg-onion-950/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-3 z-20">
+                                            <div className="w-12 h-12 border-4 border-skin-300 border-t-transparent rounded-full animate-spin"></div>
+                                            <p className="text-sm font-bold text-white animate-pulse">{t.analyzing}</p>
+                                            <div className="text-xs text-onion-300 font-mono">Running YOLOv8-seg + Calibrated Size Engine</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Controls Row: Variety Dropdown + Trigger Scan */}
+                                <div className="space-y-3 pt-1">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs text-onion-300 font-semibold mb-1 block">{t.variety}</label>
+                                            <select 
+                                                value={variety}
+                                                onChange={(e) => setVariety(e.target.value)}
+                                                className="w-full bg-onion-900 border border-onion-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-skin-300">
+                                                <option value="Nashik Red (Rabi Season)">Nashik Red (Rabi Season)</option>
+                                                <option value="Bellary Dark Red">Bellary Dark Red</option>
+                                                <option value="Tamil Nadu Small Onion (Chinna Vengayam)">Tamil Nadu Small Onion (Chinna Vengayam)</option>
+                                                <option value="Mahuva White Onion">Mahuva White Onion</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-onion-300 font-semibold mb-1 block">Lot Total Weight (kg)</label>
+                                            <input 
+                                                type="text" 
+                                                value={lotWeightKg}
+                                                onChange={(e) => setLotWeightKg(e.target.value)}
+                                                className="w-full bg-onion-900 border border-onion-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-skin-300 font-bold"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={handleRunAiScan}
+                                        disabled={isAnalyzing}
+                                        className="w-full py-3 bg-gradient-to-r from-onion-600 via-onion-500 to-onion-600 hover:from-onion-500 hover:to-onion-400 text-white font-extrabold rounded-xl transition shadow-lg flex items-center justify-center gap-2 text-sm border border-onion-400/30">
+                                        <Icon name="aperture" className="w-4 h-4 text-skin-300" />
+                                        {isAnalyzing ? "Analyzing Photo..." : t.analyzeBtn}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Right Column: AI Analysis Results & Per-Bulb Breakdown (5 cols) */}
+                            <div className="lg:col-span-5 space-y-4">
+                                
+                                {/* Headline Statistics Card */}
+                                <div className="bg-onion-950 border border-onion-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
+                                    <h3 className="text-base font-extrabold text-white flex items-center justify-between">
+                                        <span>Sample Grading Rollup</span>
+                                        <span className="text-xs font-mono text-onion-400">Sample Count: {totalOnions} Bulbs</span>
+                                    </h3>
+
+                                    {/* % Grade-A vs % URS Headline Gauges */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-xl p-3.5 text-center space-y-1">
+                                            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block">{t.gradeA}</span>
+                                            <span className="text-3xl font-black text-emerald-400">{gradeAPercent}%</span>
+                                            <span className="text-[10px] text-emerald-300/70 block font-medium">{gradeACount} Bulbs Qualified</span>
+                                        </div>
+                                        <div className="bg-rose-950/50 border border-rose-500/40 rounded-xl p-3.5 text-center space-y-1">
+                                            <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block">{t.urs}</span>
+                                            <span className="text-3xl font-black text-rose-400">{ursPercent}%</span>
+                                            <span className="text-[10px] text-rose-300/70 block font-medium">{ursCount} Defective / Small</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Defect Categorization Grid */}
+                                    <div className="bg-onion-900/60 rounded-xl p-3 border border-onion-800 space-y-2 text-xs">
+                                        <span className="font-bold text-onion-200 block text-[11px]">Explicit Defect Tagging Breakdown:</span>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="flex justify-between items-center bg-onion-950 p-2 rounded border border-onion-800">
+                                                <span className="text-emerald-400 font-medium">Healthy / Prime:</span>
+                                                <span className="font-bold text-white">{defectCounts.healthy}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-onion-950 p-2 rounded border border-onion-800">
+                                                <span className="text-amber-400 font-medium">Undersized (&lt;45mm):</span>
+                                                <span className="font-bold text-white">{defectCounts.undersized}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-onion-950 p-2 rounded border border-onion-800">
+                                                <span className="text-rose-400 font-medium">Rot / Fungal Spotting:</span>
+                                                <span className="font-bold text-white">{defectCounts.rot}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-onion-950 p-2 rounded border border-onion-800">
+                                                <span className="text-pink-400 font-medium">Sprouted Bulbs:</span>
+                                                <span className="font-bold text-white">{defectCounts.sprouted}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Calculated Lot Value Estimation */}
+                                    <div className="bg-gradient-to-r from-skin-500/20 via-onion-900 to-onion-900 border border-skin-400/30 rounded-xl p-3.5 flex items-center justify-between">
+                                        <div>
+                                            <span className="text-[11px] text-skin-300 font-bold block">Recommended Procurement Price</span>
+                                            <span className="text-xs text-onion-300">Base APMC Rate: ₹2,400/Quintal</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xl font-black text-skin-300">₹2,150</span>
+                                            <span className="text-[10px] text-onion-300 block">/ Quintal (Net adjusted for URS)</span>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setActiveTab('report')}
+                                        className="w-full py-2.5 bg-onion-800 hover:bg-onion-700 text-white font-bold rounded-xl text-xs transition border border-onion-600 flex items-center justify-center gap-2">
+                                        <Icon name="arrow-right" className="w-4 h-4 text-skin-300" />
+                                        Generate Hashed Quality Report
+                                    </button>
+                                </div>
+
+                                {/* Per-Bulb Traceability List */}
+                                <div className="bg-onion-950 border border-onion-800/80 rounded-2xl p-4 space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                                    <h4 className="text-xs font-bold text-white flex items-center justify-between sticky top-0 bg-onion-950 py-1">
+                                        <span>Per-Bulb Explainable AI Trace</span>
+                                        <span className="text-[10px] text-onion-400">Calibrated contour metrics</span>
+                                    </h4>
+                                    <div className="space-y-1.5 text-xs">
+                                        {initialOnionDetections.map((bulb) => (
+                                            <div key={bulb.id} className="flex items-center justify-between bg-onion-900/50 px-3 py-1.5 rounded border border-onion-800/60">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-2 h-2 rounded-full ${bulb.status === 'Grade A' ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
+                                                    <span className="font-bold text-white">Bulb #{bulb.id}</span>
+                                                    <span className="text-onion-300 text-[11px]">({bulb.sizeMm}mm)</span>
+                                                </div>
+                                                <span className={`font-semibold text-[11px] ${bulb.status === 'Grade A' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {bulb.defect}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB 2: DIGITAL QUALITY REPORT & CRYPTOGRAPHIC VERIFICATION */}
+                    {activeTab === 'report' && (
+                        <div className="max-w-4xl mx-auto w-full bg-onion-950 border border-onion-700/80 rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl relative">
+                            
+                            {/* Certificate Header */}
+                            <div className="border-b border-onion-800 pb-5 flex flex-wrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-onion-700 p-3 rounded-xl text-white">
+                                        <Icon name="award" className="w-8 h-8 text-skin-200" />
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-skin-300">Official Mandi Procurement Record</span>
+                                        <h2 className="text-2xl font-extrabold text-white">LYRA Digital Quality Certificate</h2>
+                                        <p className="text-xs text-onion-300">Generated under APMC Standard Grading Policy Norms</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="px-3 py-1 bg-emerald-950 text-emerald-300 border border-emerald-700/60 rounded-full text-xs font-mono font-bold">
+                                        VERIFIED & LOCKED
+                                    </span>
+                                    <span className="block text-[11px] text-onion-400 mt-1">Date: 2026-03-27 | 14:32:09 IST</span>
+                                </div>
+                            </div>
+
+                            {/* Summary Metadata Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                                <div className="bg-onion-900/60 p-3 rounded-xl border border-onion-800">
+                                    <span className="text-onion-400 block font-medium">Procurement Hub</span>
+                                    <span className="font-bold text-white text-sm">Nashik APMC #04</span>
+                                </div>
+                                <div className="bg-onion-900/60 p-3 rounded-xl border border-onion-800">
+                                    <span className="text-onion-400 block font-medium">Farmer Name</span>
+                                    <span className="font-bold text-white text-sm">Suresh Patil</span>
+                                </div>
+                                <div className="bg-onion-900/60 p-3 rounded-xl border border-onion-800">
+                                    <span className="text-onion-400 block font-medium">Lot Total Weight</span>
+                                    <span className="font-bold text-white text-sm">{lotWeightKg} kg</span>
+                                </div>
+                                <div className="bg-onion-900/60 p-3 rounded-xl border border-onion-800">
+                                    <span className="text-onion-400 block font-medium">Variety & Season</span>
+                                    <span className="font-bold text-white text-sm">{variety}</span>
+                                </div>
+                            </div>
+
+                            {/* Main Findings & Image Evidence */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-onion-900/40 p-4 rounded-xl border border-onion-800 space-y-3">
+                                    <h4 className="text-xs font-bold text-white uppercase tracking-wider text-skin-300">Grade Assessment Rollup</h4>
+                                    <div className="space-y-2 text-xs">
+                                        <div className="flex justify-between items-center py-1 border-b border-onion-800">
+                                            <span className="text-onion-300">% Marketable Grade-A:</span>
+                                            <span className="font-bold text-emerald-400 text-sm">{gradeAPercent}%</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-onion-800">
+                                            <span className="text-onion-300">% URS (Undersized/Rotten):</span>
+                                            <span className="font-bold text-rose-400 text-sm">{ursPercent}%</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1 border-b border-onion-800">
+                                            <span className="text-onion-300">Total Sample Analyzed:</span>
+                                            <span className="font-bold text-white">{totalOnions} Bulbs</span>
+                                        </div>
+                                        <div className="flex justify-between items-center py-1">
+                                            <span className="text-onion-300">Calculated Final Settlement Rate:</span>
+                                            <span className="font-black text-skin-300 text-sm">₹21.50 / kg</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-onion-900/40 p-4 rounded-xl border border-onion-800 space-y-3">
+                                    <h4 className="text-xs font-bold text-white uppercase tracking-wider text-skin-300">Annotated Sample Evidence</h4>
+                                    <div className="relative h-32 rounded-lg overflow-hidden border border-onion-700 bg-black">
+                                        <img src={uploadedImage} alt="Sample annotated" className="w-full h-full object-cover opacity-80" />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-xs font-bold text-white">
+                                            Annotated Defect Overlay Saved to Object Storage
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Cryptographic Hash Verification Banner */}
+                            <div className="bg-black/60 p-4 rounded-xl border border-onion-800 space-y-1.5 font-mono text-xs">
+                                <div className="flex items-center justify-between text-onion-300">
+                                    <span className="flex items-center gap-1.5 font-bold text-skin-300">
+                                        <Icon name="shield-check" className="w-4 h-4 text-emerald-400" />
+                                        {t.hashText}
+                                    </span>
+                                    <span className="text-[10px] text-onion-500">Tamper-Proof Ledger Stamp</span>
+                                </div>
+                                <p className="text-onion-200 text-[11px] break-all">{reportHash}</p>
+                            </div>
+
+                            {/* Joint Digital Acknowledgment Signatures */}
+                            <div className="border-t border-onion-800 pt-5 space-y-4">
+                                <h4 className="text-xs font-bold text-white">Joint Digital Acknowledgment before Settlement</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Inspector Acknowledgment */}
+                                    <div className="p-3.5 bg-onion-900/60 rounded-xl border border-emerald-500/40 flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <span className="text-[11px] text-onion-300 block">Procurement Officer</span>
+                                            <span className="text-xs font-bold text-white">R. K. Shinde (ID: #4092)</span>
+                                        </div>
+                                        <span className="px-2.5 py-1 bg-emerald-950 text-emerald-300 text-[10px] font-bold rounded-lg border border-emerald-700/60 flex items-center gap-1">
+                                            <Icon name="check" className="w-3 h-3" /> Signed
+                                        </span>
+                                    </div>
+
+                                    {/* Farmer Acknowledgment */}
+                                    <div className="p-3.5 bg-onion-900/60 rounded-xl border border-onion-700 flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <span className="text-[11px] text-onion-300 block">Farmer Confirmation</span>
+                                            <span className="text-xs font-bold text-white">Suresh Patil</span>
+                                        </div>
+                                        {isSignedByFarmer ? (
+                                            <span className="px-2.5 py-1 bg-emerald-950 text-emerald-300 text-[10px] font-bold rounded-lg border border-emerald-700/60 flex items-center gap-1">
+                                                <Icon name="check" className="w-3 h-3" /> Signed
+                                            </span>
+                                        ) : (
+                                            <button 
+                                                onClick={() => setIsSignedByFarmer(true)}
+                                                className="px-3 py-1.5 bg-skin-400 hover:bg-skin-300 text-onion-950 font-bold text-xs rounded-lg transition shadow">
+                                                {t.signOff}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    )}
+
+                    {/* TAB 3: DISPUTE APPEALS & RE-EXAMINATION */}
+                    {activeTab === 'disputes' && (
+                        <div className="space-y-6">
+                            <div className="bg-onion-950 border border-onion-800 rounded-2xl p-6 space-y-4 shadow-xl">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+                                            <Icon name="scale" className="w-5 h-5 text-amber-400" />
+                                            Evidence-Based Dispute Resolution Portal
+                                        </h2>
+                                        <p className="text-xs text-onion-300 mt-0.5">
+                                            Eliminating subjective arguments by re-examining exact annotated photo evidence
+                                        </p>
+                                    </div>
+                                    <span className="px-3 py-1 bg-amber-950 text-amber-300 border border-amber-700/50 rounded-full text-xs font-bold">
+                                        SLA: 24-Hour Appeal Window
+                                    </span>
+                                </div>
+
+                                {/* Active Dispute Instance Simulation */}
+                                <div className="bg-onion-900/60 border border-amber-500/30 rounded-xl p-5 space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-onion-800 pb-3">
+                                        <div>
+                                            <span className="text-xs text-amber-400 font-bold">Case #DISP-2026-8819</span>
+                                            <h3 className="text-sm font-bold text-white">Disputed Grade: Lot #ON-2026-0941</h3>
+                                        </div>
+                                        <div className="text-right text-xs">
+                                            <span className="text-onion-300 block">AI Baseline: 28% URS</span>
+                                            <span className="text-amber-400 font-bold">Farmer Claims: 15% URS</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Visual Evidence Comparison */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                        <div className="space-y-2">
+                                            <span className="font-semibold text-onion-200 block">1. Captured Image Evidence Overlay:</span>
+                                            <div className="relative h-40 bg-black rounded-lg overflow-hidden border border-onion-700">
+                                                <img src={uploadedImage} alt="Annotated dispute" className="w-full h-full object-cover opacity-80" />
+                                                <div className="absolute bottom-2 left-2 bg-black/80 px-2 py-1 rounded text-[10px] text-rose-400 font-bold">
+                                                    Bulbs #4, #5, #6 Flagged as URS
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 bg-onion-950 p-4 rounded-lg border border-onion-800 flex flex-col justify-between">
+                                            <div className="space-y-1.5">
+                                                <span className="font-bold text-white block">Supervisor Re-Examination Action</span>
+                                                <p className="text-onion-300 text-[11px]">
+                                                    Supervisor reviews annotated visual trace. Corrected judgment feeds directly into retraining loop.
+                                                </p>
+                                            </div>
+
+                                            {disputeFiled ? (
+                                                <div className="p-3 bg-emerald-950 border border-emerald-600 rounded-lg text-emerald-300 text-xs font-bold">
+                                                    Dispute Resolved & Retraining Loop Updated!
+                                                </div>
+                                            ) : (
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        onClick={() => setDisputeFiled(true)}
+                                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs transition">
+                                                        Uphold AI Assessment
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setDisputeFiled(true)}
+                                                        className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition">
+                                                        Override & Retrain AI
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB 4: STATE & APMC DISPUTE ANALYTICS DASHBOARD */}
+                    {activeTab === 'analytics' && (
+                        <div className="space-y-6">
+                            <div className="bg-onion-950 border border-onion-800 rounded-2xl p-6 space-y-6 shadow-xl">
+                                <div>
+                                    <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+                                        <Icon name="bar-chart-3" className="w-5 h-5 text-emerald-400" />
+                                        State Agriculture Board Dispute Analytics
+                                    </h2>
+                                    <p className="text-xs text-onion-300 mt-0.5">
+                                        Monitoring center-to-center grading consistency and surfacing human override bias
+                                    </p>
+                                </div>
+
+                                {/* Summary Stats */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-onion-900/60 p-4 rounded-xl border border-onion-800 space-y-1">
+                                        <span className="text-xs text-onion-400 block font-medium">Total Procurement Lots Graded</span>
+                                        <span className="text-2xl font-black text-white">14,280 Lots</span>
+                                        <span className="text-[10px] text-emerald-400 font-bold block">Across 18 Procurement Mandis</span>
+                                    </div>
+                                    <div className="bg-onion-900/60 p-4 rounded-xl border border-onion-800 space-y-1">
+                                        <span className="text-xs text-onion-400 block font-medium">Average Dispute Rate</span>
+                                        <span className="text-2xl font-black text-skin-300">1.8%</span>
+                                        <span className="text-[10px] text-emerald-400 font-bold block">↓ 84% reduction vs manual grading</span>
+                                    </div>
+                                    <div className="bg-onion-900/60 p-4 rounded-xl border border-onion-800 space-y-1">
+                                        <span className="text-xs text-onion-400 block font-medium">Model Consistency Kappa Score</span>
+                                        <span className="text-2xl font-black text-emerald-400">0.94 / 1.0</span>
+                                        <span className="text-[10px] text-onion-300 block">High Inter-Center Standardization</span>
+                                    </div>
+                                </div>
+
+                                {/* APMC Center Variance Table */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-bold text-white">Center-to-Center AI vs Manual Discrepancy Monitor</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead>
+                                                <tr className="border-b border-onion-800 text-onion-400">
+                                                    <th className="py-2.5 px-3 font-semibold">Procurement Center</th>
+                                                    <th className="py-2.5 px-3 font-semibold">Manual Grade-A %</th>
+                                                    <th className="py-2.5 px-3 font-semibold">AI Baseline Grade-A %</th>
+                                                    <th className="py-2.5 px-3 font-semibold">Variance Gap</th>
+                                                    <th className="py-2.5 px-3 font-semibold">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-onion-900 text-onion-200">
+                                                {apmcCentersData.map((center, index) => (
+                                                    <tr key={index} className="hover:bg-onion-900/40 transition">
+                                                        <td className="py-3 px-3 font-bold text-white">{center.name}</td>
+                                                        <td className="py-3 px-3">{center.manualAvgA}%</td>
+                                                        <td className="py-3 px-3 text-emerald-400 font-bold">{center.aiAvgA}%</td>
+                                                        <td className="py-3 px-3 text-amber-400 font-semibold">{center.gap}</td>
+                                                        <td className="py-3 px-3">
+                                                            <span className={`px-2.5 py-1 rounded text-[10px] font-bold ${
+                                                                center.status.includes('High') || center.status.includes('Audit')
+                                                                ? 'bg-rose-950 text-rose-300 border border-rose-700/60'
+                                                                : 'bg-emerald-950 text-emerald-300 border border-emerald-700/60'
+                                                            }`}>
+                                                                {center.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FOOTER & CREDITS */}
+                    <footer className="border-t border-onion-800/80 pt-4 flex flex-wrap justify-between items-center text-xs text-onion-400 gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-white">LYRA</span>
+                            <span>— Standardized AI Onion Grading Instrument</span>
+                        </div>
+                        <span>SIH 2026 Winner Prototype | Built for Mandi & APMC Procurement</span>
+                    </footer>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<LyraApp />);
+    </script>
+</body>
+</html>
